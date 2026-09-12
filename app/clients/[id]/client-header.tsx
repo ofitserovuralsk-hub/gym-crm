@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import ClientForm from "../client-form";
+import { deleteClient } from "../actions";
 import {
   STATUS_LABEL,
   STATUS_STYLE,
@@ -19,8 +21,32 @@ type Client = {
   membershipEndDate: string | null;
 };
 
-export default function ClientHeader({ client }: { client: Client }) {
+export default function ClientHeader({
+  client,
+  isOwner,
+}: {
+  client: Client;
+  isOwner: boolean;
+}) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, startDeleteTransition] = useTransition();
+
+  function handleDelete() {
+    setDeleteError(null);
+    startDeleteTransition(async () => {
+      try {
+        await deleteClient(client.id);
+        router.push("/");
+      } catch (err) {
+        setDeleteError(
+          err instanceof Error ? err.message : "Не удалось удалить клиента"
+        );
+      }
+    });
+  }
 
   if (isEditing) {
     return (
@@ -72,6 +98,15 @@ export default function ClientHeader({ client }: { client: Client }) {
               >
                 Редактировать
               </button>
+              {isOwner && !isConfirmingDelete && (
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingDelete(true)}
+                  className="rounded-lg border border-red-900 px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-950"
+                >
+                  Удалить
+                </button>
+              )}
             </div>
           </div>
           <p className="mt-2 text-sm text-slate-400">{client.phone}</p>
@@ -86,6 +121,39 @@ export default function ClientHeader({ client }: { client: Client }) {
               {formatDate(client.membershipEndDate)}
             </span>
           </p>
+
+          {isConfirmingDelete && (
+            <div className="mt-3 rounded-lg border border-red-900 bg-red-950/40 p-3">
+              <p className="text-sm text-red-300">
+                Удалить клиента «{client.fullName}» вместе со всей историей
+                (абонементы, оплаты, посещения)? Это необратимо.
+              </p>
+              {deleteError && (
+                <p className="mt-2 text-sm text-red-400">{deleteError}</p>
+              )}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                >
+                  {isDeleting ? "Удаление…" : "Да, удалить"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsConfirmingDelete(false);
+                    setDeleteError(null);
+                  }}
+                  disabled={isDeleting}
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-800"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

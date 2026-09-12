@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { type MembershipStatus } from "@/lib/status";
 import ClientHeader from "./client-header";
 import SubscriptionsSection from "./subscriptions-section";
@@ -40,6 +41,7 @@ type CheckIn = {
 };
 
 async function getClient(id: string): Promise<Client | null> {
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("clients")
     .select(
@@ -65,6 +67,7 @@ async function getClient(id: string): Promise<Client | null> {
 }
 
 async function getSubscriptions(clientId: string): Promise<Subscription[]> {
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("subscriptions")
     .select("id, type, start_date, end_date, status")
@@ -85,6 +88,7 @@ async function getSubscriptions(clientId: string): Promise<Subscription[]> {
 }
 
 async function getPayments(clientId: string): Promise<Payment[]> {
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("payments")
     .select("id, amount, method, paid_at")
@@ -104,6 +108,7 @@ async function getPayments(clientId: string): Promise<Payment[]> {
 }
 
 async function getCheckIns(clientId: string): Promise<CheckIn[]> {
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("check_ins")
     .select("id, checked_in_at")
@@ -128,10 +133,11 @@ export default async function ClientDetailPage({
   const client = await getClient(params.id);
   if (!client) notFound();
 
-  const [subscriptions, payments, checkIns] = await Promise.all([
+  const [subscriptions, payments, checkIns, currentUser] = await Promise.all([
     getSubscriptions(params.id),
     getPayments(params.id),
     getCheckIns(params.id),
+    getCurrentUser(),
   ]);
 
   return (
@@ -141,7 +147,7 @@ export default async function ClientDetailPage({
       </Link>
 
       <div className="mt-4">
-        <ClientHeader client={client} />
+        <ClientHeader client={client} isOwner={currentUser?.role === "owner"} />
       </div>
 
       <CheckInsSection clientId={client.id} checkIns={checkIns} />

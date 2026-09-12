@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { getGymToday } from "@/lib/status";
 
 export const REMINDER_WINDOW_DAYS = 7;
@@ -18,6 +18,7 @@ function addDays(dateStr: string, days: number): string {
 }
 
 export async function getExpiringClients(): Promise<ExpiringClient[]> {
+  const supabase = createClient();
   const todayStr = getGymToday();
   const untilStr = addDays(todayStr, REMINDER_WINDOW_DAYS);
 

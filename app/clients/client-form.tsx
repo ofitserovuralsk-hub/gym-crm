@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createClient as createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createClient, updateClient, type ClientFormData } from "./actions";
 import CameraCapture from "./camera-capture";
 
@@ -19,6 +19,7 @@ type ClientFormProps = {
 };
 
 async function uploadPhoto(blob: Blob): Promise<string> {
+  const supabase = createSupabaseBrowserClient();
   const path = `${crypto.randomUUID()}.jpg`;
   const { error } = await supabase.storage
     .from("client-photos")

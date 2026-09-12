@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { formatDate, SUBSCRIPTION_TYPE_LABEL } from "@/lib/status";
+import {
+  formatDate,
+  formatCurrency,
+  SUBSCRIPTION_TYPE_LABEL,
+  PAYMENT_METHOD_OPTIONS,
+  PAYMENT_METHOD_LABEL,
+} from "@/lib/status";
 import { addPayment } from "./actions";
 
 type Payment = {
@@ -18,20 +24,6 @@ type SubscriptionOption = {
   endDate: string | null;
 };
 
-const METHOD_OPTIONS = [
-  { value: "cash", label: "Наличные" },
-  { value: "card", label: "Карта" },
-  { value: "kaspi", label: "Kaspi" },
-] as const;
-
-const METHOD_LABEL: Record<string, string> = Object.fromEntries(
-  METHOD_OPTIONS.map((opt) => [opt.value, opt.label])
-);
-
-function formatAmount(amount: number): string {
-  return `${amount.toLocaleString("ru-RU")} ₸`;
-}
-
 export default function PaymentsSection({
   clientId,
   payments,
@@ -43,7 +35,7 @@ export default function PaymentsSection({
 }) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<string>(METHOD_OPTIONS[0].value);
+  const [method, setMethod] = useState<string>(PAYMENT_METHOD_OPTIONS[0].value);
   const [paidAt, setPaidAt] = useState("");
   const [subscriptionId, setSubscriptionId] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +43,7 @@ export default function PaymentsSection({
 
   function resetForm() {
     setAmount("");
-    setMethod(METHOD_OPTIONS[0].value);
+    setMethod(PAYMENT_METHOD_OPTIONS[0].value);
     setPaidAt("");
     setSubscriptionId("");
     setError(null);
@@ -123,7 +115,7 @@ export default function PaymentsSection({
                 onChange={(e) => setMethod(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-100"
               >
-                {METHOD_OPTIONS.map((opt) => (
+                {PAYMENT_METHOD_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
@@ -190,9 +182,9 @@ export default function PaymentsSection({
             ) : (
               payments.map((payment) => (
                 <tr key={payment.id} className="border-t border-slate-800">
-                  <td className="px-4 py-2">{formatAmount(payment.amount)}</td>
+                  <td className="px-4 py-2">{formatCurrency(payment.amount)}</td>
                   <td className="px-4 py-2">
-                    {METHOD_LABEL[payment.method] ?? payment.method}
+                    {PAYMENT_METHOD_LABEL[payment.method] ?? payment.method}
                   </td>
                   <td className="px-4 py-2">{formatDate(payment.paidAt)}</td>
                 </tr>

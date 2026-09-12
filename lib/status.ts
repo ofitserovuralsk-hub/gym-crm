@@ -22,9 +22,23 @@ export const SUBSCRIPTION_TYPE_LABEL: Record<string, string> = Object.fromEntrie
   SUBSCRIPTION_TYPE_OPTIONS.map((opt) => [opt.value, opt.label])
 );
 
+export const PAYMENT_METHOD_OPTIONS = [
+  { value: "cash", label: "Наличные" },
+  { value: "card", label: "Карта" },
+  { value: "kaspi", label: "Kaspi" },
+] as const;
+
+export const PAYMENT_METHOD_LABEL: Record<string, string> = Object.fromEntries(
+  PAYMENT_METHOD_OPTIONS.map((opt) => [opt.value, opt.label])
+);
+
+export function formatCurrency(amount: number): string {
+  return `${amount.toLocaleString("ru-RU")} ₸`;
+}
+
 // Зал находится в Уральске — фиксируем часовой пояс явно, чтобы даты не
 // сдвигались из-за таймзоны сервера (в проде это может быть UTC, локально — другая).
-const GYM_TIME_ZONE = "Asia/Oral";
+export const GYM_TIME_ZONE = "Asia/Oral";
 
 export function getGymToday(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: GYM_TIME_ZONE });

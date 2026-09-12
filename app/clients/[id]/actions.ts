@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function addSubscription(
   clientId: string,
   data: { type: string; startDate: string; endDate: string }
 ) {
+  const supabase = createClient();
   const { error } = await supabase.from("subscriptions").insert({
     client_id: clientId,
     type: data.type,
@@ -32,6 +33,7 @@ export async function addPayment(
     subscriptionId: string | null;
   }
 ) {
+  const supabase = createClient();
   const { error } = await supabase.from("payments").insert({
     client_id: clientId,
     subscription_id: data.subscriptionId,
@@ -48,6 +50,7 @@ export async function addPayment(
 }
 
 export async function addCheckIn(clientId: string) {
+  const supabase = createClient();
   const { error } = await supabase.from("check_ins").insert({
     client_id: clientId,
   });

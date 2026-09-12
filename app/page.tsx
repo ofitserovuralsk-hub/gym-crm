@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { type MembershipStatus } from "@/lib/status";
 import { getExpiringClients } from "@/lib/reminders";
+import { getCurrentUser } from "@/lib/auth";
 import ClientsList from "./clients-list";
 
 // Данные всегда свежие (Supabase-запросы идут с cache: "no-store") — без этой
@@ -17,6 +18,7 @@ type Client = {
 };
 
 async function getClients(): Promise<Client[]> {
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("clients")
     .select("id, full_name, phone, membership_status, membership_end_date")
@@ -36,9 +38,10 @@ async function getClients(): Promise<Client[]> {
 }
 
 export default async function ClientsPage() {
-  const [clients, expiringClients] = await Promise.all([
+  const [clients, expiringClients, currentUser] = await Promise.all([
     getClients(),
     getExpiringClients(),
+    getCurrentUser(),
   ]);
 
   return (
@@ -51,6 +54,14 @@ export default async function ClientsPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {currentUser?.role === "owner" && (
+            <Link
+              href="/analytics"
+              className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-800"
+            >
+              Аналитика
+            </Link>
+          )}
           {expiringClients.length > 0 && (
             <Link
               href="/reminders"

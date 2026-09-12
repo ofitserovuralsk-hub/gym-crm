@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/supabase";
+import { createClient as createSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 
 export type ClientFormData = {
   fullName: string;
@@ -10,7 +11,10 @@ export type ClientFormData = {
   photoUrl: string | null;
 };
 
-export async function createClient(data: ClientFormData): Promise<{ id: string }> {
+export async function createClient(
+  data: ClientFormData
+): Promise<{ id: string }> {
+  const supabase = createSupabaseClient();
   const { data: inserted, error } = await supabase
     .from("clients")
     .insert({
@@ -31,6 +35,7 @@ export async function createClient(data: ClientFormData): Promise<{ id: string }
 }
 
 export async function updateClient(id: string, data: ClientFormData) {
+  const supabase = createSupabaseClient();
   const { error } = await supabase
     .from("clients")
     .update({
@@ -47,4 +52,20 @@ export async function updateClient(id: string, data: ClientFormData) {
 
   revalidatePath("/");
   revalidatePath(`/clients/${id}`);
+}
+
+export async function deleteClient(id: string) {
+  const currentUser = await getCurrentUser();
+  if (currentUser?.role !== "owner") {
+    throw new Error("Удаление клиентов доступно только владельцу");
+  }
+
+  const supabase = createSupabaseClient();
+  const { error } = await supabase.from("clients").delete().eq("id", id);
+
+  if (error) {
+    throw new Error(`Не удалось удалить клиента: ${error.message}`);
+  }
+
+  revalidatePath("/");
 }
