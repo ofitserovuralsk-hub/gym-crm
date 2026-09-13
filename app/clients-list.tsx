@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   STATUS_LABEL,
   STATUS_STYLE,
@@ -33,6 +34,8 @@ export default function ClientsList({ clients }: { clients: Client[] }) {
   const [statusFilter, setStatusFilter] = useState<MembershipStatus | "all">(
     "all"
   );
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const filteredClients = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -50,6 +53,12 @@ export default function ClientsList({ clients }: { clients: Client[] }) {
       return matchesStatus && matchesSearch;
     });
   }, [clients, search, statusFilter]);
+
+  const handleClientClick = (clientId: string) => {
+    startTransition(() => {
+      router.push(`/clients/${clientId}`);
+    });
+  };
 
   return (
     <>
@@ -91,10 +100,11 @@ export default function ClientsList({ clients }: { clients: Client[] }) {
           </p>
         ) : (
           filteredClients.map((client) => (
-            <Link
+            <button
               key={client.id}
-              href={`/clients/${client.id}`}
-              className="rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-sm transition hover:border-slate-700"
+              onClick={() => handleClientClick(client.id)}
+              disabled={isPending}
+              className="rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-sm transition hover:border-slate-700 disabled:opacity-50 text-left cursor-pointer"
             >
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-base font-medium">{client.fullName}</h2>
@@ -115,7 +125,7 @@ export default function ClientsList({ clients }: { clients: Client[] }) {
                   {formatDate(client.membershipEndDate)}
                 </span>
               </p>
-            </Link>
+            </button>
           ))
         )}
       </div>
