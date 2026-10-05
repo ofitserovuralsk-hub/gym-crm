@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import RegisterSW from "./register-sw";
+import OfflineSync from "./offline-sync";
 import UserBar from "./user-bar";
 import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
@@ -36,6 +37,7 @@ export default async function RootLayout({
     <html lang="ru">
       <body className="bg-slate-950 text-slate-100 min-h-screen">
         <RegisterSW />
+        {user && <OfflineSync />}
         {user && <UserBar email={user.email} role={user.role} />}
         {children}
       </body>

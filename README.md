@@ -1,58 +1,168 @@
-# Gym CRM — каркас PWA (Этап 1-2)
+# Gym CRM — техническая карта проекта
 
-Это база для установки приложения на экран и офлайн-чтения данных.
-Офлайн-запись (чек-ины без сети) — отдельный, следующий этап.
+Этот файл — снапшот того, что уже реализовано и как всё устроено технически.
+Продуктовый контекст, роадмап и правила работы — в [CLAUDE.md](CLAUDE.md).
+Перед новой задачей: сначала прочитай этот файл, потом уже открывай код —
+это почти всегда быстрее, чем grep по всему проекту.
+
+## Стек
+
+- Next.js 14 (App Router, TypeScript), Tailwind CSS
+- Supabase: Postgres + Auth + Storage
+- PWA: manifest + service worker (кэш офлайн-чтения)
+- Деплой: пока не задеплоено на Vercel (сделаем, когда всё допилим)
+- Репозиторий: https://github.com/ofitserovuralsk-hub/gym-crm
+
+## Как запустить локально
+
+```bash
+npm install
+npm run dev
+```
+
+Нужен `.env.local` (не в git, см. `.env.local.example`):
+
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...   # это "publishable" ключ Supabase, не секретный
+```
+
+**Аккаунты для входа создаются вручную** в Supabase Dashboard →
+Authentication → Users (публичной регистрации нет). Роль задаётся через SQL
+после создания пользователя:
+
+```sql
+update auth.users
+set raw_user_meta_data = raw_user_meta_data || '{"role": "owner"}'::jsonb
+where email = '...';
+```
+
+Роль по умолчанию, если не задана — `admin`. Значения: `admin` | `owner`.
 
 ## Структура
 
 ```
-pwa-gym-crm/
-├── public/
-│   ├── manifest.json      # метаданные PWA (имя, иконки, цвета)
-│   ├── service-worker.js  # кэширование статики и API-ответов
-│   └── offline.html       # заглушка при полном отсутствии сети и кэша
-└── app/
-    └── register-sw.tsx    # регистрирует service worker на клиенте
+middleware.ts                        — гейт авторизации (редирект на /login), обновление сессии
+
+app/
+  layout.tsx                         — root layout, async: подгружает текущего юзера, рендерит <UserBar>
+  user-bar.tsx                       — верхняя панель (email · роль · Выйти), не рендерится если не залогинен
+  page.tsx                           — список клиентов (/), + ссылки "Напоминания"/"Аналитика" (последняя — только owner)
+  clients-list.tsx                   — клиентский компонент: поиск по имени/телефону + фильтр по статусу
+  login/page.tsx                     — форма входа (email/password через Supabase Auth)
+  reminders/page.tsx                 — клиенты с истекающим абонементом (окно из lib/reminders.ts)
+  analytics/page.tsx                 — owner-only: выручка (всего/по месяцам/по способу), отток клиентов
+  clients/
+    actions.ts                      — createClient, updateClient, deleteClient (deleteClient проверяет role==="owner" на сервере)
+    client-form.tsx                 — форма создания/редактирования клиента, включает камеру
+    camera-capture.tsx              — снимок с веб-камеры (getUserMedia) → Blob → загрузка в Storage при сабмите формы
+    new/page.tsx                    — страница создания клиента
+    [id]/
+      page.tsx                     — карточка клиента, грузит client+subscriptions+payments+checkIns+currentUser параллельно
+      actions.ts                   — addSubscription, addPayment, addCheckIn
+      client-header.tsx            — фото (160×160) + инфо + кнопки Редактировать/Удалить(owner)
+      subscriptions-section.tsx    — таблица абонементов + форма добавления
+      payments-section.tsx         — таблица оплат + форма (с опциональной привязкой к абонементу)
+      checkins-section.tsx         — история посещений + кнопка "Отметить приход"; при сетевой
+                                       ошибке кладёт чек-ин в офлайн-очередь (lib/offline-queue.ts)
+                                       и показывает его в списке с пометкой "ждёт синхронизации"
+  offline-sync.tsx                  — без UI, смонтирован в layout при наличии юзера: при загрузке
+                                       и по событию "online" досылает очередь через addCheckIn,
+                                       затем router.refresh() и CustomEvent "offline-queue-synced"
+
+lib/
+  auth.ts                           — getCurrentUser(): { id, email, role } | null, читает user_metadata.role
+  status.ts                         — все константы/форматтеры: STATUS_LABEL/STYLE, SUBSCRIPTION_TYPE_*,
+                                       PAYMENT_METHOD_*, formatDate/formatDateTime/formatCurrency, getGymToday(), GYM_TIME_ZONE
+  reminders.ts                      — getExpiringClients(), REMINDER_WINDOW_DAYS = 7
+  offline-queue.ts                  — очередь чек-инов в IndexedDB (gym-crm-offline/pending_checkins):
+                                       queueCheckIn/getQueuedCheckIns/syncQueuedCheckIns; чисто клиентский
+                                       модуль (guard на typeof window), синхронизацией не занимается сам —
+                                       это делает вызывающий (offline-sync.tsx)
+  supabase/
+    client.ts                      — browser client (createBrowserClient), для client components
+    server.ts                      — server client (createServerClient, cookie-aware), для Server Components/Actions
+
+public/
+  manifest.json, service-worker.js, offline.html, icons/  — PWA
+
+supabase/*.sql                      — миграции, ВСЕ уже выполнены в проекте (см. ниже про auth_policies.sql)
 ```
 
-## Как подключить в Next.js (App Router)
+## Схема БД (Supabase Postgres)
 
-1. Скопируй `public/*` и `app/register-sw.tsx` в свой проект в те же папки.
+| Таблица | Ключевые поля | Примечания |
+|---|---|---|
+| `clients` | full_name, phone, birth_date, photo_url, membership_status, membership_end_date | status: `active`\|`expired`\|`frozen` (англ., несмотря на русский UI) |
+| `subscriptions` | client_id, type, start_date, end_date, status | **Создана пользователем до меня**, не мной. type: `unlimited`\|`single`\|`sessions`. Есть триггер (тоже не мой), синхронизирующий `clients.membership_status`/`membership_end_date` из активного абонемента |
+| `payments` | client_id, subscription_id (nullable), amount, method, paid_at | method: `cash`\|`card`\|`kaspi` |
+| `check_ins` | client_id, checked_in_at | просто лог посещений |
+| Storage bucket `client-photos` | — | публичный бакет для фото с камеры |
 
-2. В `app/layout.tsx` подключи манифест через metadata API и добавь `<RegisterSW />`:
+RLS на всех 4 таблицах и на `storage.objects` (для `client-photos`) требует
+`auth.role() = 'authenticated'` — анонимный доступ по publishable-ключу
+запрещён везде.
 
-```tsx
-import RegisterSW from "./register-sw";
+⚠️ `supabase/auth_policies.sql` в репозитории — это то, что **должно** быть
+применено, но SQL Editor в этом проекте Supabase не может выполнять
+`DROP POLICY`/`ALTER TABLE` (падает `must be owner of relation X`, хотя
+`pg_tables.tableowner = postgres`). Реальные политики создавались вручную
+через Dashboard → Authentication → Policies. Файл — для справки/истории,
+не для повторного запуска as-is.
 
-export const metadata = {
-  manifest: "/manifest.json",
-  themeColor: "#0f172a",
-};
+## Известные грабли (уже наступали — не наступай снова)
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="ru">
-      <body>
-        <RegisterSW />
-        {children}
-      </body>
-    </html>
-  );
-}
-```
+1. **Не смешивай `next build` и `next dev` в одной `.next`.** После продакшен-сборки
+   `.next` содержит несовместимые артефакты для dev-режима → почти все JS-чанки
+   отдают 404, React не гидратируется, клики по кнопкам ничего не делают.
+   Всегда `rm -rf .next` при переключении режимов.
+2. **Service worker регистрируется только в production** (`app/register-sw.tsx`
+   проверяет `NODE_ENV`). В dev он мешает — кэширует старый HTML, вызывает
+   рассинхрон с новым JS-бандлом (ошибки гидратации) при живой разработке.
+3. **Service worker не должен трогать не-GET запросы** — Server Actions идут
+   через POST, а `Cache.put()` кидает исключение на не-GET. В fetch-хендлере
+   первым делом `if (request.method !== "GET") return;`.
+4. **Таймзона фиксирована на `Asia/Oral`** (`GYM_TIME_ZONE` в `lib/status.ts`).
+   Сервер может рендериться в любом часовом поясе (UTC на Vercel, что угодно
+   локально) — без явного `timeZone` в `toLocaleDateString` даты сдвигаются
+   на день.
+5. **Supabase-клиенты всегда с `cache: "no-store"`**, страницы с
+   `export const dynamic = "force-dynamic"` — иначе `next build` падает
+   ("Dynamic server usage") или показывает статичные закэшированные данные.
+6. **Next.js `<Link>` не делает полный HTTP-запрос документа** (клиентская
+   RSC-навигация) — офлайн-кэш service worker'а реально ловит только полные
+   переходы (прямой заход по URL/перезагрузка), не клики по ссылкам.
+7. **Камера (`camera-capture.tsx`)**: привязывать `stream` к `videoRef.current`
+   нужно в `useEffect` по `isCameraOn`, а не сразу после `setIsCameraOn(true)` —
+   `<video>` рендерится условно и ещё не смонтирован в момент вызова.
+8. **Пароли/секреты не ввожу сам ни при каких обстоятельствах** — даже если
+   пользователь явно даёт логин/пароль в чате. Тестирование логина — только
+   руками пользователя или через Claude in Chrome с их подтверждением на
+   каждом шаге, без ввода credentials с моей стороны.
 
-3. Добавь иконки `icon-192.png` и `icon-512.png` в `public/icons/` — размеры должны совпадать с manifest.json. Пока можно взять любой квадратный логотип зала и сгенерировать нужные размеры (например, через любой онлайн-favicon-генератор).
+## Роли и права
 
-4. Задеплой на Vercel (или запусти `npm run build && npm start` локально) — по HTTP на localhost service worker тоже работает, но для реального телефона нужен HTTPS (Vercel даёт это из коробки).
+- `owner`: видит /analytics, видит и может нажать "Удалить" на карточке клиента
+- `admin`: всё остальное (полный CRUD клиентов/абонементов/оплат/чек-инов)
+- Проверка роли всегда дублируется на сервере (в Server Action), не только
+  скрытием кнопки в UI — см. `deleteClient` в `app/clients/actions.ts`
 
-5. Проверка установки: открой сайт с телефона в Chrome → в меню появится "Добавить на главный экран". Если не появляется — проверь в DevTools → Application → Manifest и Service Workers на ошибки.
+## Что не реализовано (см. CLAUDE.md за планом)
 
-## Что уже работает
+- Расписание групповых занятий
+- Управление аккаунтами сотрудников через UI (сейчас — только вручную в
+  Supabase Dashboard, это осознанное решение, не забытая фича)
 
-- Приложение можно "установить" как иконку на телефон/десктоп
-- Список клиентов/абонементов, однажды загруженный, остаётся доступен офлайн (из кэша)
-- При полном отсутствии сети и кэша показывается `offline.html` вместо белого экрана
+## Офлайн-очередь чек-инов
 
-## Чего ещё нет (следующий этап)
-
-- **Запись данных офлайн**: если тренер отмечает чек-ин клиента без интернета, это сейчас никуда не сохранится, кроме как в памяти вкладки. Следующий шаг — очередь в IndexedDB, которая при восстановлении сети синхронизируется с сервером (Supabase). Это отдельная, более тонкая задача — лучше делать её после того, как заработают базовые CRUD-экраны (клиенты, абонементы) на реальном интернете.
+Если "Отметить приход" не смог уйти на сервер (нет сети — `TypeError` от
+`fetch` или `navigator.onLine === false`), запись кладётся в IndexedDB
+(`lib/offline-queue.ts`) и сразу показывается в списке посещений с меткой
+"офлайн · ждёт синхронизации". `app/offline-sync.tsx` смонтирован в
+layout и досылает очередь через тот же Server Action `addCheckIn`: при
+загрузке приложения и по событию `online`. Ограничение по конструкции: это
+чисто клиентская JS-очередь, а не Background Sync API — синхронизация
+происходит, только пока открыта вкладка с приложением (что и требовалось:
+ресепшен не закрывает вкладку в течение смены). Страница карточки клиента
+при этом должна быть уже открыта/закэширована до потери сети — см. пункт 6
+в "Известные грабли" про то, что SW кэширует только полные переходы.
