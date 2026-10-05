@@ -95,3 +95,8 @@ export function getWeekStart(isoDate: string): string {
   const weekday = new Date(`${isoDate}T00:00:00Z`).getUTCDay() || 7;
   return addDays(isoDate, 1 - weekday);
 }
+
+export const ROLE_LABEL = {
+  admin: "Администратор",
+  owner: "Владелец",
+} as const;

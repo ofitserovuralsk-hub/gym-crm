@@ -68,6 +68,14 @@ export default async function ClientsPage() {
           </Link>
           {currentUser?.role === "owner" && (
             <Link
+              href="/staff"
+              className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-800"
+            >
+              Сотрудники
+            </Link>
+          )}
+          {currentUser?.role === "owner" && (
+            <Link
               href="/analytics"
               className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-800"
             >

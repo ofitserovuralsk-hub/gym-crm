@@ -25,19 +25,23 @@ npm run dev
 ```
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...   # это "publishable" ключ Supabase, не секретный
+SUPABASE_SERVICE_ROLE_KEY=...       # СЕКРЕТНЫЙ, только сервер (раздел /staff)
 ```
 
-**Аккаунты для входа создаются вручную** в Supabase Dashboard →
-Authentication → Users (публичной регистрации нет). Роль задаётся через SQL
-после создания пользователя:
+**Аккаунты сотрудников** создаёт владелец в разделе `/staff` (создать, роль,
+смена пароля, удаление). Публичной регистрации нет. **Самого первого владельца**
+нужно создать вручную: Supabase Dashboard → Authentication → Users, затем роль:
 
 ```sql
 update auth.users
-set raw_user_meta_data = raw_user_meta_data || '{"role": "owner"}'::jsonb
+set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role": "owner"}'::jsonb
 where email = '...';
 ```
 
-Роль по умолчанию, если не задана — `admin`. Значения: `admin` | `owner`.
+Роль хранится в `app_metadata` (меняется только сервером), **не** в `user_metadata`
+(её пользователь может править сам). Роль по умолчанию — `admin`. Значения: `admin` | `owner`.
+Для `/staff` нужен серверный `SUPABASE_SERVICE_ROLE_KEY` (в `.env.local` и в Vercel;
+секретный, не коммитить, не светить в чатах).
 
 ## Структура
 
@@ -51,6 +55,9 @@ app/
   clients-list.tsx                   — клиентский компонент: поиск по имени/телефону + фильтр по статусу
   login/page.tsx                     — форма входа (email/password через Supabase Auth)
   reminders/page.tsx                 — клиенты с истекающим абонементом (окно из lib/reminders.ts)
+  staff/                             — owner-only: управление аккаунтами (Auth Admin API через service_role)
+    actions.ts                      — createStaff, changeStaffRole, resetStaffPassword, deleteStaff; везде requireOwner(),
+                                       нельзя удалить себя / сменить себе роль / удалить последнего владельца
   trainers/                          — тренеры: список, добавление (ФИО, телефон), удаление; у каждого видны его занятия
   schedule/                          — расписание групповых занятий (недельное, повторяющееся)
     page.tsx                        — неделя по дням (?week=YYYY-MM-DD, стрелки ‹ ›); записи грузятся на даты выбранной недели
@@ -78,7 +85,7 @@ app/
                                        затем router.refresh() и CustomEvent "offline-queue-synced"
 
 lib/
-  auth.ts                           — getCurrentUser(): { id, email, role } | null, читает user_metadata.role
+  auth.ts                           — getCurrentUser(): { id, email, role } | null, читает app_metadata.role (не user_metadata — её юзер может менять сам)
   status.ts                         — все константы/форматтеры: STATUS_LABEL/STYLE, SUBSCRIPTION_TYPE_*,
                                        PAYMENT_METHOD_*, formatDate/formatDateTime/formatCurrency, getGymToday(), GYM_TIME_ZONE
   reminders.ts                      — getExpiringClients(), REMINDER_WINDOW_DAYS = 7
@@ -87,6 +94,7 @@ lib/
                                        модуль (guard на typeof window), синхронизацией не занимается сам —
                                        это делает вызывающий (offline-sync.tsx)
   supabase/
+    admin.ts                       — клиент с service_role (только сервер, обходит RLS)
     client.ts                      — browser client (createBrowserClient), для client components
     server.ts                      — server client (createServerClient, cookie-aware), для Server Components/Actions
 
@@ -161,8 +169,6 @@ RLS на всех 4 таблицах и на `storage.objects` (для `client-p
 
 - Расписание: лимит мест/лист ожидания, редактирование занятия (сейчас только
   добавить/удалить), отмена отдельного занятия на конкретную дату
-- Управление аккаунтами сотрудников через UI (сейчас — только вручную в
-  Supabase Dashboard, это осознанное решение, не забытая фича)
 
 ## Офлайн-очередь чек-инов
 

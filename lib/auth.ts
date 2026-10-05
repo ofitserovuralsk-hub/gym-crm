@@ -16,7 +16,10 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   if (!user) return null;
 
-  const role: Role = user.user_metadata?.role === "owner" ? "owner" : "admin";
+  // Роль берём из app_metadata: её может менять только сервер (service_role).
+  // user_metadata пользователь правит сам через supabase.auth.updateUser,
+  // поэтому доверять ей для прав доступа нельзя.
+  const role: Role = user.app_metadata?.role === "owner" ? "owner" : "admin";
 
   return { id: user.id, email: user.email ?? null, role };
 }
