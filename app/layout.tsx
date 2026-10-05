@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import RegisterSW from "./register-sw";
 import OfflineSync from "./offline-sync";
+import InstallButton from "./install-button";
 import UserBar from "./user-bar";
 import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
@@ -40,6 +41,7 @@ export default async function RootLayout({
         {user && <OfflineSync />}
         {user && <UserBar email={user.email} role={user.role} />}
         {children}
+        <InstallButton />
       </body>
     </html>
   );
