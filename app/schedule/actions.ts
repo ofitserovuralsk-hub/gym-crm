@@ -6,18 +6,21 @@ import { createClient } from "@/lib/supabase/server";
 export async function addGroupClass(data: {
   name: string;
   trainer: string;
-  weekday: number;
+  weekdays: number[];
   startTime: string;
   durationMinutes: number;
 }) {
   const supabase = createClient();
-  const { error } = await supabase.from("group_classes").insert({
-    name: data.name.trim(),
-    trainer: data.trainer.trim() || null,
-    weekday: data.weekday,
-    start_time: data.startTime,
-    duration_minutes: data.durationMinutes,
-  });
+  // По одной строке на каждый выбранный день недели.
+  const { error } = await supabase.from("group_classes").insert(
+    data.weekdays.map((weekday) => ({
+      name: data.name.trim(),
+      trainer: data.trainer.trim() || null,
+      weekday,
+      start_time: data.startTime,
+      duration_minutes: data.durationMinutes,
+    }))
+  );
 
   if (error) {
     throw new Error(`Не удалось добавить занятие: ${error.message}`);

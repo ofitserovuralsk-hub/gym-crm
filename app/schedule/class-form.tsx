@@ -11,7 +11,7 @@ export default function ClassForm() {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [trainer, setTrainer] = useState("");
-  const [weekday, setWeekday] = useState<number>(1);
+  const [weekdays, setWeekdays] = useState<number[]>([]);
   const [startTime, setStartTime] = useState("");
   const [duration, setDuration] = useState("60");
   const [error, setError] = useState<string | null>(null);
@@ -20,10 +20,16 @@ export default function ClassForm() {
   function reset() {
     setName("");
     setTrainer("");
-    setWeekday(1);
+    setWeekdays([]);
     setStartTime("");
     setDuration("60");
     setError(null);
+  }
+
+  function toggleWeekday(value: number) {
+    setWeekdays((prev) =>
+      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
+    );
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -31,6 +37,10 @@ export default function ClassForm() {
     const durationValue = Number(duration);
     if (!name.trim()) {
       setError("Укажите название занятия");
+      return;
+    }
+    if (weekdays.length === 0) {
+      setError("Выберите хотя бы один день недели");
       return;
     }
     if (!startTime) {
@@ -47,7 +57,7 @@ export default function ClassForm() {
         await addGroupClass({
           name,
           trainer,
-          weekday,
+          weekdays,
           startTime,
           durationMinutes: durationValue,
         });
@@ -74,7 +84,7 @@ export default function ClassForm() {
           onSubmit={handleSubmit}
           className="mt-4 rounded-xl border border-slate-800 bg-slate-900 p-4"
         >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="text-sm text-slate-300">
               Название
               <input
@@ -91,20 +101,6 @@ export default function ClassForm() {
                 onChange={(e) => setTrainer(e.target.value)}
                 className={inputClass}
               />
-            </label>
-            <label className="text-sm text-slate-300">
-              День недели
-              <select
-                value={weekday}
-                onChange={(e) => setWeekday(Number(e.target.value))}
-                className={inputClass}
-              >
-                {WEEKDAY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
             </label>
             <label className="text-sm text-slate-300">
               Начало
@@ -126,6 +122,33 @@ export default function ClassForm() {
               />
             </label>
           </div>
+
+          <fieldset className="mt-4">
+            <legend className="text-sm text-slate-300">Дни недели</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {WEEKDAY_OPTIONS.map((opt) => {
+                const checked = weekdays.includes(opt.value);
+                return (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${
+                      checked
+                        ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
+                        : "border-slate-700 text-slate-300 hover:bg-slate-800"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleWeekday(opt.value)}
+                      className="accent-emerald-500"
+                    />
+                    {opt.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
 
           {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
 
