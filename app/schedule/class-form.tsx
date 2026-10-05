@@ -13,10 +13,12 @@ const MINUTES = Array.from({ length: 12 }, (_, i) =>
   String(i * 5).padStart(2, "0")
 );
 
-export default function ClassForm() {
+export type TrainerOption = { id: string; fullName: string };
+
+export default function ClassForm({ trainers }: { trainers: TrainerOption[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
-  const [trainer, setTrainer] = useState("");
+  const [trainerId, setTrainerId] = useState("");
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [hour, setHour] = useState("");
   const [minute, setMinute] = useState("00");
@@ -26,7 +28,7 @@ export default function ClassForm() {
 
   function reset() {
     setName("");
-    setTrainer("");
+    setTrainerId("");
     setWeekdays([]);
     setHour("");
     setMinute("00");
@@ -64,7 +66,7 @@ export default function ClassForm() {
       try {
         await addGroupClass({
           name,
-          trainer,
+          trainerId: trainerId || null,
           weekdays,
           startTime: `${hour}:${minute}`,
           durationMinutes: durationValue,
@@ -104,11 +106,23 @@ export default function ClassForm() {
             </label>
             <label className="text-sm text-slate-300">
               Тренер
-              <input
-                value={trainer}
-                onChange={(e) => setTrainer(e.target.value)}
+              <select
+                value={trainerId}
+                onChange={(e) => setTrainerId(e.target.value)}
                 className={inputClass}
-              />
+              >
+                <option value="">Без тренера</option>
+                {trainers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.fullName}
+                  </option>
+                ))}
+              </select>
+              {trainers.length === 0 && (
+                <span className="mt-1 block text-xs text-slate-500">
+                  Сначала добавьте тренеров в разделе «Тренеры»
+                </span>
+              )}
             </label>
             <div className="text-sm text-slate-300">
               Начало

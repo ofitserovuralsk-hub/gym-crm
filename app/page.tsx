@@ -60,6 +60,12 @@ export default async function ClientsPage() {
           >
             Расписание
           </Link>
+          <Link
+            href="/trainers"
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-800"
+          >
+            Тренеры
+          </Link>
           {currentUser?.role === "owner" && (
             <Link
               href="/analytics"

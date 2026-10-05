@@ -9,7 +9,7 @@ import {
   getWeekStart,
   type MembershipStatus,
 } from "@/lib/status";
-import ClassForm from "./class-form";
+import ClassForm, { type TrainerOption } from "./class-form";
 import DeleteClassButton from "./delete-class-button";
 import EnrollmentPanel, {
   type ClientOption,
@@ -31,7 +31,9 @@ async function getClasses(): Promise<GroupClass[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("group_classes")
-    .select("id, name, trainer, weekday, start_time, duration_minutes")
+    .select(
+      "id, name, trainer, weekday, start_time, duration_minutes, trainers(full_name)",
+    )
     .order("weekday")
     .order("start_time");
 
@@ -42,11 +44,29 @@ async function getClasses(): Promise<GroupClass[]> {
   return data.map((row) => ({
     id: row.id,
     name: row.name,
-    trainer: row.trainer,
+    // trainers — связанный тренер; текст в trainer — запасной вариант для
+    // занятий, созданных до появления раздела "Тренеры".
+    trainer:
+      (row.trainers as unknown as { full_name: string } | null)?.full_name ??
+      row.trainer,
     weekday: row.weekday,
     startTime: row.start_time,
     durationMinutes: row.duration_minutes,
   }));
+}
+
+async function getTrainerOptions(): Promise<TrainerOption[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("trainers")
+    .select("id, full_name")
+    .order("full_name");
+
+  if (error) {
+    throw new Error(`Не удалось загрузить тренеров: ${error.message}`);
+  }
+
+  return data.map((row) => ({ id: row.id, fullName: row.full_name }));
 }
 
 async function getClients(): Promise<ClientOption[]> {
@@ -127,7 +147,10 @@ export default async function SchedulePage({
   const weekEnd = addDays(weekStart, 6);
   const weekDates = WEEKDAY_OPTIONS.map((_, i) => addDays(weekStart, i));
 
-  const classes = await getClasses();
+  const [classes, trainers] = await Promise.all([
+    getClasses(),
+    getTrainerOptions(),
+  ]);
   const [clients, enrollments] = await Promise.all([
     getClients(),
     getEnrollments(weekDates),
@@ -178,7 +201,7 @@ export default async function SchedulePage({
       </div>
 
       <div className="mt-4">
-        <ClassForm />
+        <ClassForm trainers={trainers} />
       </div>
 
       <div className="mt-6 flex flex-col gap-4">

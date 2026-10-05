@@ -51,6 +51,7 @@ app/
   clients-list.tsx                   — клиентский компонент: поиск по имени/телефону + фильтр по статусу
   login/page.tsx                     — форма входа (email/password через Supabase Auth)
   reminders/page.tsx                 — клиенты с истекающим абонементом (окно из lib/reminders.ts)
+  trainers/                          — тренеры: список, добавление (ФИО, телефон), удаление; у каждого видны его занятия
   schedule/                          — расписание групповых занятий (недельное, повторяющееся)
     page.tsx                        — неделя по дням (?week=YYYY-MM-DD, стрелки ‹ ›); записи грузятся на даты выбранной недели
     actions.ts                      — addGroupClass, deleteGroupClass, enrollClient, unenrollClient
@@ -103,7 +104,8 @@ supabase/*.sql                      — миграции, ВСЕ уже выпо
 | `subscriptions` | client_id, type, start_date, end_date, status | **Создана пользователем до меня**, не мной. type: `unlimited`\|`single`\|`sessions`. Есть триггер (тоже не мой), синхронизирующий `clients.membership_status`/`membership_end_date` из активного абонемента |
 | `payments` | client_id, subscription_id (nullable), amount, method, paid_at | method: `cash`\|`card`\|`kaspi` |
 | `check_ins` | client_id, checked_in_at | просто лог посещений |
-| `group_classes` | name, trainer, weekday (1=Пн…7=Вс), start_time, duration_minutes | повторяется каждую неделю |
+| `trainers` | full_name, phone | назначаются на занятия через group_classes.trainer_id |
+| `group_classes` | name, trainer (устар. текст), trainer_id, weekday (1=Пн…7=Вс), start_time, duration_minutes | повторяется каждую неделю |
 | `class_enrollments` | class_id, client_id, class_date | unique(class_id, client_id, class_date); лимита мест нет |
 | Storage bucket `client-photos` | — | публичный бакет для фото с камеры |
 

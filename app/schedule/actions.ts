@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function addGroupClass(data: {
   name: string;
-  trainer: string;
+  trainerId: string | null;
   weekdays: number[];
   startTime: string;
   durationMinutes: number;
@@ -15,7 +15,7 @@ export async function addGroupClass(data: {
   const { error } = await supabase.from("group_classes").insert(
     data.weekdays.map((weekday) => ({
       name: data.name.trim(),
-      trainer: data.trainer.trim() || null,
+      trainer_id: data.trainerId,
       weekday,
       start_time: data.startTime,
       duration_minutes: data.durationMinutes,
