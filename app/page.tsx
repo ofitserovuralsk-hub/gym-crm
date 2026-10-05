@@ -54,6 +54,12 @@ export default async function ClientsPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/schedule"
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-800"
+          >
+            Расписание
+          </Link>
           {currentUser?.role === "owner" && (
             <Link
               href="/analytics"

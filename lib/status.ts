@@ -65,3 +65,19 @@ export function formatDateTime(isoDateTime: string | null): string {
     timeZone: GYM_TIME_ZONE,
   });
 }
+
+// ISO-дни недели (1 = понедельник) для расписания групповых занятий.
+export const WEEKDAY_OPTIONS = [
+  { value: 1, label: "Понедельник" },
+  { value: 2, label: "Вторник" },
+  { value: 3, label: "Среда" },
+  { value: 4, label: "Четверг" },
+  { value: 5, label: "Пятница" },
+  { value: 6, label: "Суббота" },
+  { value: 7, label: "Воскресенье" },
+] as const;
+
+// Postgres `time` приходит как "HH:MM:SS" — для показа обрезаем до "HH:MM".
+export function formatTime(time: string): string {
+  return time.slice(0, 5);
+}
