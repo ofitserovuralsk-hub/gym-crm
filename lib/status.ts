@@ -81,3 +81,14 @@ export const WEEKDAY_OPTIONS = [
 export function formatTime(time: string): string {
   return time.slice(0, 5);
 }
+
+// Ближайшая дата (включая сегодня) для занятия, которое идёт в заданный
+// ISO-день недели. Считаем в таймзоне зала, арифметика — в UTC, чтобы не
+// зависеть от таймзоны сервера.
+export function getNextClassDate(weekday: number): string {
+  const today = new Date(`${getGymToday()}T00:00:00Z`);
+  const todayWeekday = today.getUTCDay() === 0 ? 7 : today.getUTCDay();
+  const diff = (weekday - todayWeekday + 7) % 7;
+  today.setUTCDate(today.getUTCDate() + diff);
+  return today.toISOString().slice(0, 10);
+}

@@ -51,6 +51,11 @@ app/
   clients-list.tsx                   — клиентский компонент: поиск по имени/телефону + фильтр по статусу
   login/page.tsx                     — форма входа (email/password через Supabase Auth)
   reminders/page.tsx                 — клиенты с истекающим абонементом (окно из lib/reminders.ts)
+  schedule/                          — расписание групповых занятий (недельное, повторяющееся)
+    page.tsx                        — неделя по дням; для каждого занятия грузит записи на ближайшую дату
+    actions.ts                      — addGroupClass, deleteGroupClass, enrollClient, unenrollClient
+    class-form.tsx / delete-class-button.tsx — добавление/удаление занятия
+    enrollment-panel.tsx            — раскрывающийся список записавшихся + поиск клиента для записи
   analytics/page.tsx                 — owner-only: выручка (всего/по месяцам/по способу), отток клиентов
   clients/
     actions.ts                      — createClient, updateClient, deleteClient (deleteClient проверяет role==="owner" на сервере)
@@ -97,6 +102,8 @@ supabase/*.sql                      — миграции, ВСЕ уже выпо
 | `subscriptions` | client_id, type, start_date, end_date, status | **Создана пользователем до меня**, не мной. type: `unlimited`\|`single`\|`sessions`. Есть триггер (тоже не мой), синхронизирующий `clients.membership_status`/`membership_end_date` из активного абонемента |
 | `payments` | client_id, subscription_id (nullable), amount, method, paid_at | method: `cash`\|`card`\|`kaspi` |
 | `check_ins` | client_id, checked_in_at | просто лог посещений |
+| `group_classes` | name, trainer, weekday (1=Пн…7=Вс), start_time, duration_minutes | повторяется каждую неделю |
+| `class_enrollments` | class_id, client_id, class_date | unique(class_id, client_id, class_date); лимита мест нет |
 | Storage bucket `client-photos` | — | публичный бакет для фото с камеры |
 
 RLS на всех 4 таблицах и на `storage.objects` (для `client-photos`) требует
@@ -149,7 +156,8 @@ RLS на всех 4 таблицах и на `storage.objects` (для `client-p
 
 ## Что не реализовано (см. CLAUDE.md за планом)
 
-- Расписание групповых занятий
+- Расписание: выбор недели (запись только на ближайшую дату занятия), записи в карточке
+  клиента, проверка абонемента при записи, лимит мест/лист ожидания
 - Управление аккаунтами сотрудников через UI (сейчас — только вручную в
   Supabase Dashboard, это осознанное решение, не забытая фича)
 
