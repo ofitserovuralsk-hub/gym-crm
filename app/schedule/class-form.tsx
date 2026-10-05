@@ -7,12 +7,19 @@ import { addGroupClass } from "./actions";
 const inputClass =
   "mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-100";
 
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+// Шаг 5 минут — хватает и для "18:00", и для нестандартных "18:10".
+const MINUTES = Array.from({ length: 12 }, (_, i) =>
+  String(i * 5).padStart(2, "0")
+);
+
 export default function ClassForm() {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [trainer, setTrainer] = useState("");
   const [weekdays, setWeekdays] = useState<number[]>([]);
-  const [startTime, setStartTime] = useState("");
+  const [hour, setHour] = useState("");
+  const [minute, setMinute] = useState("00");
   const [duration, setDuration] = useState("60");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -21,7 +28,8 @@ export default function ClassForm() {
     setName("");
     setTrainer("");
     setWeekdays([]);
-    setStartTime("");
+    setHour("");
+    setMinute("00");
     setDuration("60");
     setError(null);
   }
@@ -43,7 +51,7 @@ export default function ClassForm() {
       setError("Выберите хотя бы один день недели");
       return;
     }
-    if (!startTime) {
+    if (!hour) {
       setError("Укажите время начала");
       return;
     }
@@ -58,7 +66,7 @@ export default function ClassForm() {
           name,
           trainer,
           weekdays,
-          startTime,
+          startTime: `${hour}:${minute}`,
           durationMinutes: durationValue,
         });
         reset();
@@ -102,15 +110,37 @@ export default function ClassForm() {
                 className={inputClass}
               />
             </label>
-            <label className="text-sm text-slate-300">
+            <div className="text-sm text-slate-300">
               Начало
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className={inputClass}
-              />
-            </label>
+              <div className="mt-1 flex items-center gap-1">
+                <select
+                  aria-label="Час"
+                  value={hour}
+                  onChange={(e) => setHour(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-100"
+                >
+                  <option value="">чч</option>
+                  {HOURS.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+                <span>:</span>
+                <select
+                  aria-label="Минуты"
+                  value={minute}
+                  onChange={(e) => setMinute(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-100"
+                >
+                  {MINUTES.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <label className="text-sm text-slate-300">
               Длительность (мин)
               <input
