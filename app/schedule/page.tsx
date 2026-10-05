@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { WEEKDAY_OPTIONS, formatTime, getNextClassDate } from "@/lib/status";
+import {
+  WEEKDAY_OPTIONS,
+  addDays,
+  formatDate,
+  formatTime,
+  getGymToday,
+  getWeekStart,
+  type MembershipStatus,
+} from "@/lib/status";
 import ClassForm from "./class-form";
 import DeleteClassButton from "./delete-class-button";
 import EnrollmentPanel, {
@@ -45,7 +53,7 @@ async function getClients(): Promise<ClientOption[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("clients")
-    .select("id, full_name, phone")
+    .select("id, full_name, phone, membership_status, membership_end_date")
     .order("full_name");
 
   if (error) {
@@ -56,10 +64,12 @@ async function getClients(): Promise<ClientOption[]> {
     id: row.id,
     fullName: row.full_name,
     phone: row.phone,
+    membershipStatus: row.membership_status as MembershipStatus,
+    membershipEndDate: row.membership_end_date,
   }));
 }
 
-// Записи только на ближайшие даты занятий — ключ "classId|date".
+// Записи на даты выбранной недели — ключ "classId|date".
 async function getEnrollments(
   dates: string[],
 ): Promise<Map<string, Enrollment[]>> {
@@ -99,15 +109,30 @@ function endTime(start: string, durationMinutes: number): string {
   return `${hh}:${mm}`;
 }
 
-export default async function SchedulePage() {
-  const classes = await getClasses();
-  const nextDates = new Map(
-    classes.map((c) => [c.id, getNextClassDate(c.weekday)]),
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export default async function SchedulePage({
+  searchParams,
+}: {
+  searchParams: { week?: string };
+}) {
+  const today = getGymToday();
+  const requested = searchParams.week;
+  // Любую дату из ?week= приводим к понедельнику; мусор — к текущей неделе.
+  const weekStart = getWeekStart(
+    requested && DATE_RE.test(requested) && !isNaN(Date.parse(requested))
+      ? requested
+      : today,
   );
+  const weekEnd = addDays(weekStart, 6);
+  const weekDates = WEEKDAY_OPTIONS.map((_, i) => addDays(weekStart, i));
+
+  const classes = await getClasses();
   const [clients, enrollments] = await Promise.all([
     getClients(),
-    getEnrollments([...new Set(nextDates.values())]),
+    getEnrollments(weekDates),
   ]);
+  const currentWeekStart = getWeekStart(today);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
@@ -124,12 +149,41 @@ export default async function SchedulePage() {
         </div>
       </div>
 
+      <div className="mt-4 flex items-center gap-2">
+        <Link
+          href={`/schedule?week=${addDays(weekStart, -7)}`}
+          className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+          aria-label="Предыдущая неделя"
+        >
+          ‹
+        </Link>
+        <span className="min-w-44 text-center text-sm font-medium text-slate-200">
+          {formatDate(weekStart)} – {formatDate(weekEnd)}
+        </span>
+        <Link
+          href={`/schedule?week=${addDays(weekStart, 7)}`}
+          className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+          aria-label="Следующая неделя"
+        >
+          ›
+        </Link>
+        {weekStart !== currentWeekStart && (
+          <Link
+            href="/schedule"
+            className="ml-2 text-sm text-emerald-400 hover:text-emerald-300"
+          >
+            Текущая неделя
+          </Link>
+        )}
+      </div>
+
       <div className="mt-4">
         <ClassForm />
       </div>
 
       <div className="mt-6 flex flex-col gap-4">
-        {WEEKDAY_OPTIONS.map((day) => {
+        {WEEKDAY_OPTIONS.map((day, dayIndex) => {
+          const dayDate = weekDates[dayIndex];
           const dayClasses = classes.filter((c) => c.weekday === day.value);
           return (
             <section
@@ -137,7 +191,17 @@ export default async function SchedulePage() {
               className="rounded-xl border border-slate-800 bg-slate-900 p-4"
             >
               <h2 className="text-sm font-semibold text-slate-300">
-                {day.label}
+                {day.label}{" "}
+                <span
+                  className={
+                    dayDate === today
+                      ? "font-normal text-emerald-400"
+                      : "font-normal text-slate-500"
+                  }
+                >
+                  {formatDate(dayDate).slice(0, 5)}
+                  {dayDate === today && " · сегодня"}
+                </span>
               </h2>
               {dayClasses.length === 0 ? (
                 <p className="mt-2 text-sm text-slate-500">Занятий нет</p>
@@ -167,10 +231,9 @@ export default async function SchedulePage() {
                       </div>
                       <EnrollmentPanel
                         classId={c.id}
-                        classDate={nextDates.get(c.id)!}
+                        classDate={dayDate}
                         enrollments={
-                          enrollments.get(`${c.id}|${nextDates.get(c.id)}`) ??
-                          []
+                          enrollments.get(`${c.id}|${dayDate}`) ?? []
                         }
                         clients={clients}
                       />

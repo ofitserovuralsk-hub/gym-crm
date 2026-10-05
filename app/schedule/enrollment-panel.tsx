@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { formatDate } from "@/lib/status";
+import { formatDate, type MembershipStatus } from "@/lib/status";
 import { enrollClient, unenrollClient } from "./actions";
 
 export type Enrollment = {
@@ -14,7 +14,22 @@ export type ClientOption = {
   id: string;
   fullName: string;
   phone: string;
+  membershipStatus: MembershipStatus;
+  membershipEndDate: string | null;
 };
+
+// Запись не блокируем (решает администратор), но предупреждаем.
+function getMembershipWarning(
+  client: ClientOption,
+  classDate: string,
+): string | null {
+  if (client.membershipStatus === "expired") return "абонемент истёк";
+  if (client.membershipStatus === "frozen") return "абонемент заморожен";
+  if (client.membershipEndDate && client.membershipEndDate < classDate) {
+    return `абонемент закончится ${formatDate(client.membershipEndDate)}`;
+  }
+  return null;
+}
 
 export default function EnrollmentPanel({
   classId,
@@ -40,7 +55,7 @@ export default function EnrollmentPanel({
           (c) =>
             !enrolledIds.has(c.id) &&
             (c.fullName.toLowerCase().includes(normalized) ||
-              c.phone.includes(normalized))
+              c.phone.includes(normalized)),
         )
         .slice(0, 5)
     : [];
@@ -100,24 +115,40 @@ export default function EnrollmentPanel({
           />
           {matches.length > 0 && (
             <ul className="mt-2 flex flex-col gap-1">
-              {matches.map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() =>
-                      run(async () => {
-                        await enrollClient(classId, c.id, classDate);
-                        setQuery("");
-                      })
-                    }
-                    className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    {c.fullName}{" "}
-                    <span className="text-slate-500">{c.phone}</span>
-                  </button>
-                </li>
-              ))}
+              {matches.map((c) => {
+                const warning = getMembershipWarning(c, classDate);
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => {
+                        if (
+                          warning &&
+                          !window.confirm(
+                            `У клиента ${warning}. Всё равно записать?`,
+                          )
+                        ) {
+                          return;
+                        }
+                        run(async () => {
+                          await enrollClient(classId, c.id, classDate);
+                          setQuery("");
+                        });
+                      }}
+                      className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {c.fullName}{" "}
+                      <span className="text-slate-500">{c.phone}</span>
+                      {warning && (
+                        <span className="ml-2 text-xs text-amber-400">
+                          ⚠ {warning}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
           {normalized && matches.length === 0 && (

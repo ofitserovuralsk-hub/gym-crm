@@ -10,7 +10,7 @@
 - Next.js 14 (App Router, TypeScript), Tailwind CSS
 - Supabase: Postgres + Auth + Storage
 - PWA: manifest + service worker (кэш офлайн-чтения)
-- Деплой: пока не задеплоено на Vercel (сделаем, когда всё допилим)
+- Деплой: Vercel, https://gym-crm-off.vercel.app (импорт из GitHub, env: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY)
 - Репозиторий: https://github.com/ofitserovuralsk-hub/gym-crm
 
 ## Как запустить локально
@@ -52,7 +52,7 @@ app/
   login/page.tsx                     — форма входа (email/password через Supabase Auth)
   reminders/page.tsx                 — клиенты с истекающим абонементом (окно из lib/reminders.ts)
   schedule/                          — расписание групповых занятий (недельное, повторяющееся)
-    page.tsx                        — неделя по дням; для каждого занятия грузит записи на ближайшую дату
+    page.tsx                        — неделя по дням (?week=YYYY-MM-DD, стрелки ‹ ›); записи грузятся на даты выбранной недели
     actions.ts                      — addGroupClass, deleteGroupClass, enrollClient, unenrollClient
     class-form.tsx / delete-class-button.tsx — добавление/удаление занятия
     enrollment-panel.tsx            — раскрывающийся список записавшихся + поиск клиента для записи
@@ -68,6 +68,7 @@ app/
       client-header.tsx            — фото (160×160) + инфо + кнопки Редактировать/Удалить(owner)
       subscriptions-section.tsx    — таблица абонементов + форма добавления
       payments-section.tsx         — таблица оплат + форма (с опциональной привязкой к абонементу)
+      class-enrollments-section.tsx — записи клиента на групповые занятия (последние 20)
       checkins-section.tsx         — история посещений + кнопка "Отметить приход"; при сетевой
                                        ошибке кладёт чек-ин в офлайн-очередь (lib/offline-queue.ts)
                                        и показывает его в списке с пометкой "ждёт синхронизации"
@@ -156,8 +157,8 @@ RLS на всех 4 таблицах и на `storage.objects` (для `client-p
 
 ## Что не реализовано (см. CLAUDE.md за планом)
 
-- Расписание: выбор недели (запись только на ближайшую дату занятия), записи в карточке
-  клиента, проверка абонемента при записи, лимит мест/лист ожидания
+- Расписание: лимит мест/лист ожидания, редактирование занятия (сейчас только
+  добавить/удалить), отмена отдельного занятия на конкретную дату
 - Управление аккаунтами сотрудников через UI (сейчас — только вручную в
   Supabase Dashboard, это осознанное решение, не забытая фича)
 

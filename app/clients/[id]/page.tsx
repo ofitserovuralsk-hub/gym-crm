@@ -7,6 +7,9 @@ import ClientHeader from "./client-header";
 import SubscriptionsSection from "./subscriptions-section";
 import PaymentsSection from "./payments-section";
 import CheckInsSection from "./checkins-section";
+import ClassEnrollmentsSection, {
+  type ClassEnrollment,
+} from "./class-enrollments-section";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +48,7 @@ async function getClient(id: string): Promise<Client | null> {
   const { data, error } = await supabase
     .from("clients")
     .select(
-      "id, full_name, phone, birth_date, photo_url, membership_status, membership_end_date"
+      "id, full_name, phone, birth_date, photo_url, membership_status, membership_end_date",
     )
     .eq("id", id)
     .maybeSingle();
@@ -125,6 +128,38 @@ async function getCheckIns(clientId: string): Promise<CheckIn[]> {
   }));
 }
 
+// Последние 20 записей: будущие и недавние прошедшие, свежие сверху.
+async function getClassEnrollments(
+  clientId: string,
+): Promise<ClassEnrollment[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("class_enrollments")
+    .select("id, class_date, group_classes(name, trainer, start_time)")
+    .eq("client_id", clientId)
+    .order("class_date", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    throw new Error(`Не удалось загрузить записи на занятия: ${error.message}`);
+  }
+
+  return data.map((row) => {
+    const cls = row.group_classes as unknown as {
+      name: string;
+      trainer: string | null;
+      start_time: string;
+    } | null;
+    return {
+      id: row.id,
+      classDate: row.class_date,
+      className: cls?.name ?? "—",
+      trainer: cls?.trainer ?? null,
+      startTime: cls?.start_time ?? "",
+    };
+  });
+}
+
 export default async function ClientDetailPage({
   params,
 }: {
@@ -133,12 +168,14 @@ export default async function ClientDetailPage({
   const client = await getClient(params.id);
   if (!client) notFound();
 
-  const [subscriptions, payments, checkIns, currentUser] = await Promise.all([
-    getSubscriptions(params.id),
-    getPayments(params.id),
-    getCheckIns(params.id),
-    getCurrentUser(),
-  ]);
+  const [subscriptions, payments, checkIns, classEnrollments, currentUser] =
+    await Promise.all([
+      getSubscriptions(params.id),
+      getPayments(params.id),
+      getCheckIns(params.id),
+      getClassEnrollments(params.id),
+      getCurrentUser(),
+    ]);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -151,7 +188,11 @@ export default async function ClientDetailPage({
       </div>
 
       <CheckInsSection clientId={client.id} checkIns={checkIns} />
-      <SubscriptionsSection clientId={client.id} subscriptions={subscriptions} />
+      <ClassEnrollmentsSection enrollments={classEnrollments} />
+      <SubscriptionsSection
+        clientId={client.id}
+        subscriptions={subscriptions}
+      />
       <PaymentsSection
         clientId={client.id}
         payments={payments}
